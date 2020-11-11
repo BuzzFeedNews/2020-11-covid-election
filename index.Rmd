@@ -1,0 +1,129 @@
+---
+title: "Places With More COVID-19 Deaths Were Expected To Turn Away From Trump. They Didn’t."
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(eval = TRUE, warning = FALSE, message=FALSE)
+options(scipen = 999)
+```
+
+Data and [R](https://www.r-project.org/) code behind the analysis referenced in [this Nov. 11, 2020 BuzzFeed News post](https://buzzfeednews.cm/article/peteraldhous/coronavirus-deaths-unemployment-trump-election-results) discussing the extent to which death rates from COVID-19 and surges in unemployment related to pandemic lockdowns could explain swings in voter preference at the county level between the 2016 and 2020 presidential elections.
+
+### Setting up and loading data
+
+County-level election returns data for 2020 is from [Decision Desk HQ](https://results.decisiondeskhq.com/), complete to 10 am Eastern, Nov. 10; data for the 2016 election is from the [MIT Election Data + Science Lab](https://electionlab.mit.edu/). Data on cumulative COVID-19 death rates by county to Nov. 2 is from the [New York Times](https://github.com/nytimes/covid-19-data) (and [USAFacts](https://usafacts.org/visualizations/coronavirus-covid-19-spread-map/) for counties within New York City and in the Kansas City area). County-level data on unemployment rates is from the [Bureau of Labor Statistics](https://www.bls.gov/lau/); because this data is not seasonally corrected, we calculated the annual change in unemployment rate over the 12 months to the most recent month available, September 2020. Counts in many counties for the 2020 election have not yet finished. To minimize any biases caused by counties with large numbers of uncounted votes, the analysis includes only counties that where the vote count exceeded 95% of the turnout predicted by Decision Desk HQ before the election.
+
+```{r}
+# required packages
+library(tidyverse)
+library(tidymodels)
+
+# load and process election results data
+results <- read_csv("data/2020-county-results-vs-2016.csv") %>%
+  mutate(swing = dem_vs_prev * 100,
+         lead = case_when(dem_margin < 0 ~ "Trump",
+                          dem_margin > 0 ~ "Biden")) %>%
+  filter(!is.na(swing) & vote_prop_est > 0.95) %>%
+  arrange(-total_votes_2020)
+
+# load covid data 
+covid <- read_csv("data/covid.csv")
+
+# load county level unemployment data
+unem <- read_csv("data/unem.csv")
+
+# joins
+covid_results_unem <- inner_join(covid,results, by = c("fips_county" = "geoid")) %>%
+  select(-state.x,-county_name) %>%
+  rename(state = state.y) %>%
+  inner_join(unem) %>%
+  arrange(-total_votes_2020)
+```
+
+### Scatter plot of COVID-19 death rate vs. swing
+
+```{r}
+ggplot(covid_results_unem, aes(x = deaths_per_100k, y = swing, size = total_votes_2020)) + 
+  geom_point(shape = 21, stroke = 0.5, color = "black", alpha = 0.3, aes(fill = lead)) +
+  geom_smooth(size = 0.2, method = "lm", se = TRUE, color = "black") +
+  scale_size_area(max_size = 15) +
+  scale_fill_manual(values = c("#74b3d3","#fb6066"), name = "") +
+  xlab("Deaths per 100,000 people") +
+  ylab("Swing from Trump") +
+  theme_minimal(base_family = "Basier Square SemiBold", base_size = 14) +
+  theme(legend.position = "none",
+        panel.background = element_rect(fill = "#f1f1f2", size = 0),
+        plot.background = element_rect(fill = "#f1f1f2", size = 0))
+  
+```
+
+On this chart, each circle is a county, scaled by the number of votes counted in the 2020 election; counties are colored blue if Biden leads in the count, red if Trump leads.
+
+The swing is the difference in the percentage point margin between Donald Trump and Hillary Clinton in 2016 and the percentage point margin between Donald Trump and Joe Biden in 2020. A positive swing means that voters shifted away from Trump in 2020; a negative swing means they shifted toward him in 2020.
+
+The trend line shows that, overall, voters seemed to swing slightly to Trump in the counties with higher COVID-19 death rates. The shaded gray ribbon shows the standard error of the linear trend line.
+
+### Scatter plot of change in the unemployment rate vs. swing
+
+```{r}
+ggplot(covid_results_unem, aes(x = points_change_unem_rate, y = swing, size = total_votes_2020)) + 
+  geom_point(shape = 21, stroke = 0.3, color = "black", alpha = 0.5, aes(fill = lead)) +
+  geom_smooth(size = 0.2, method = "lm", se = TRUE, color = "black") +
+  scale_size_area(max_size = 15) +
+  scale_fill_manual(values = c("#74b3d3","#fb6066"), name = "") +
+  xlab("Change in unemployment rate") +
+  ylab("Swing from Trump") +
+  theme_minimal(base_family = "Basier Square SemiBold", base_size = 14) +
+  theme(legend.position = "none",
+        panel.background = element_rect(fill = "#f1f1f2", size = 0),
+        plot.background = element_rect(fill = "#f1f1f2", size = 0))
+
+```
+
+On this chart, the change in unemployment rate is the percentage point difference in unemployment rate between Sept. 2019 and Sept. 2020. Positive numbers mean that unemployment has risen. Unemployment related to pandemic lockdowns has hit hardest in large, mostly urban counties that tended to back Biden. The trend line is almost flat.
+
+### Regression model
+
+This linear regression model examines in more detail if and how COVID-19 deaths and surging unemployment seemed to influence swing at the county level.
+
+```{r}
+lm_mod <- 
+  linear_reg() %>% 
+  set_engine("lm")
+
+lm_fit <- 
+  lm_mod %>% 
+  fit(swing ~ deaths_per_100k * points_change_unem_rate, data = covid_results_unem)
+  
+tidy(lm_fit)
+glance(lm_fit)
+```
+
+The adjusted R squared value indicates that this model accounted for less than 3% of the variation in swings at the county level. Clearly this is a crude model that fails to account for many other variables that may have influenced shifts in voter preferences. However, it suggests that COVID-19 deaths and unemployment triggered by pandemic lockdowns had a small influence on swings at the county level.
+
+The model did find a statistically significant interaction between COVID-19 deaths and unemployment. As the chart below shows, the trend for higher death rates tobe associated with swings toward Trump seemed to be more pronounced in counties that experienced a greater surge in unemployment.
+
+```{r}
+covid_results_unem <- covid_results_unem %>%
+  mutate(unem_bin = case_when(points_change_unem_rate < 3 ~ "Less than 3 points",
+                              points_change_unem_rate >= 3 ~ "3 points or more"),
+         unem_bin = factor(unem_bin, c("Less than 3 points", "3 points or more")))
+
+ggplot(covid_results_unem, aes(x = deaths_per_100k, y = swing, size = total_votes_2020)) +
+  geom_point(shape = 21, stroke = 0.3, color = "black", alpha = 0.5, aes(fill = lead)) +
+  geom_smooth(size = 0.2, method = "lm", se = TRUE, color = "black") +
+  scale_size_area(max_size = 15) +
+  scale_fill_manual(values = c("#74b3d3","#fb6066"), name = "") +
+  xlab("Deaths per 100,000 people") +
+  ylab("Swing from Trump") +
+  theme_minimal(base_family = "Basier Square SemiBold", base_size = 14) +
+  theme(legend.position = "none",
+        panel.background = element_rect(fill = "#f1f1f2", size = 0),
+        plot.background = element_rect(fill = "#f1f1f2", size = 0)) +
+  facet_wrap(~unem_bin)
+```
+
+### Acknowledgements
+
+Many thanks to [Julia Silge](https://juliasilge.com/) of RStudio and Jeremy Singer Vine, BuzzFeed News data editor, for helpful comments on the analysis.
