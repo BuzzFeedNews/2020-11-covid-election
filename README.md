@@ -4,7 +4,7 @@
 
 ## Methodology/Code
 
-The code to process the data and repeat the analysis can be found online [here](https://buzzfeednews.github.io/2020-11-election-covid/), and in the R Markdown document index.Rmd.
+The code to process the data and repeat the analysis can be found online [here](https://buzzfeednews.github.io/2020-11-covid-election/), and in the R Markdown document index.Rmd.
 
 
 ## Questions/Feedback

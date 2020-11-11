@@ -1,5 +1,5 @@
 ---
-title: "Places With More COVID-19 Deaths Were Expected To Turn Away From Trump. They Didn’t."
+title: "Trump Was Expected To Lose Votes In Places Where More People Have Died Of COVID-19. He Didn’t."
 output: html_document
 ---
 
@@ -8,7 +8,7 @@ knitr::opts_chunk$set(eval = TRUE, warning = FALSE, message=FALSE)
 options(scipen = 999)
 ```
 
-Data and [R](https://www.r-project.org/) code behind the analysis referenced in [this Nov. 11, 2020 BuzzFeed News post](https://buzzfeednews.cm/article/peteraldhous/coronavirus-deaths-unemployment-trump-election-results) discussing the extent to which death rates from COVID-19 and surges in unemployment related to pandemic lockdowns could explain swings in voter preference at the county level between the 2016 and 2020 presidential elections.
+Data and [R](https://www.r-project.org/) code behind the analysis referenced in [this Nov. 11, 2020 BuzzFeed News post](https://buzzfeednews.com/article/peteraldhous/coronavirus-deaths-unemployment-trump-election-results) discussing the extent to which death rates from COVID-19 and surges in unemployment related to pandemic lockdowns could explain swings in voter preference at the county level between the 2016 and 2020 presidential elections.
 
 ### Setting up and loading data
 
